@@ -2,20 +2,31 @@
 
 A Docker-only document processing pipeline that converts a directory of images into a deduplicated Markdown document using OCR.
 
+## Overview
+
+**Goal**: Process bulk image collections (screenshots, scanned documents, photos) through OCR and produce a single, deduplicated Markdown file with all extracted text.
+
+**Current State**: The pipeline currently handles image discovery, deterministic ordering, and staging. OCR processing and text extraction are in development.
+
 ## Quickstart
 
-1. Place your images (JPEG/PNG) in the `./input` directory
-2. Run: `docker compose up --build`
-3. Outputs will appear in `./output`
+```bash
+# Place images in ./input directory
+docker compose up --build
 
-## Expected Behavior (Milestone 0)
+# Outputs appear in ./output
+```
 
-Currently, the pipeline only performs image discovery. It will:
-- Scan the input directory for images (`.jpg`, `.jpeg`, `.png`)
-- Log the number of images found
-- Create the output directory if it doesn't exist
+## How It Works
 
-No OCR processing is performed yet. This is a scaffolding milestone.
+The pipeline processes images through these stages:
+
+1. **Image Discovery**: Recursively scans for images (`.jpg`, `.jpeg`, `.png`)
+2. **Deterministic Ordering**: Sorts images naturally (e.g., `IMG_9.jpg` before `IMG_10.jpg`)
+3. **Staging**: Copies images to `preprocessed/` with sequential names
+4. **OCR & Text Extraction**: *(In development)* Converts images to PDF, runs OCR, extracts text
+5. **Deduplication**: *(In development)* Removes near-duplicate content using SimHash
+6. **Markdown Output**: *(In development)* Produces final `.md` file with deduplicated text
 
 ## Usage
 
@@ -32,108 +43,41 @@ docker build -t bulk-ocr .
 docker run --rm \
   -v ./input:/work/input:ro \
   -v ./output:/work/output \
-  bulk-ocr run \
-  --input /work/input \
-  --out /work/output
+  bulk-ocr run --input /work/input --out /work/output
 ```
 
-### Local Development
-
-```bash
-# Build
-go build ./cmd/pipeline
-
-# Run
-./pipeline run --input input --out output
-
-# Subcommands
-./pipeline version
-./pipeline doctor
-```
-
-## Flags
+### Command Line Options
 
 - `--input` (default: `input`): Input directory containing images
 - `--out` (default: `output`): Output directory for results
-- `--keep-artifacts` (default: `true`): Keep intermediate artifacts
-- `--lang` (default: `eng`): OCR language (not used in Milestone 0)
+- `--recursive` (default: `true`): Search subdirectories recursively
+- `--keep-artifacts` (default: `true`): Keep intermediate processing files
+- `--lang` (default: `eng`): OCR language code
+
+### Subcommands
+
+- `pipeline version`: Show version information
+- `pipeline doctor`: Check toolchain health (verifies OCR tools are installed)
 
 ## Troubleshooting
 
-### No images found
+**No images found**: Ensure images are in the input directory with supported extensions (`.jpg`, `.jpeg`, `.png`, case-insensitive).
 
-- Ensure images are in the `./input` directory (or the directory specified by `--input`)
-- Supported extensions: `.jpg`, `.jpeg`, `.png` (case-insensitive)
-- The pipeline searches recursively through subdirectories
+**Docker build fails**: Verify Docker is running and `go.mod` is valid.
 
-### Docker build fails
+**Permission errors**: Ensure the output directory is writable.
 
-- Ensure Docker is installed and running
-- Check that `go.mod` exists and is valid
-- Verify the Dockerfile syntax
+## Development
 
-### Permission errors
-
-- Ensure the output directory is writable
-- On Linux/Mac, you may need to adjust directory permissions
-
-## Development Setup
-
-### Prerequisites
-
-- Go 1.23 or later
-- Docker and Docker Compose
-- Make (optional, for convenience targets)
-
-### Local Development
+Built with Go 1.23+. Uses Docker for all external dependencies (Tesseract, ocrmypdf, pdftotext, img2pdf).
 
 ```bash
-# Format code
-make fmt-fix
-
 # Run tests
 make test
 
-# Run linter
-make lint
-
-# Build binary
+# Build locally
 make build
 
-# Build Docker image
-make docker-build
+# Check toolchain
+make doctor
 ```
-
-### Running Tests
-
-```bash
-# All tests
-go test ./...
-
-# With race detector
-go test ./... -race
-
-# With coverage
-make test-coverage
-```
-
-## Project Structure
-
-```
-.
-├── cmd/pipeline/      # CLI entry point
-├── internal/          # Internal packages
-│   ├── runner/        # External command execution
-│   ├── ingest/        # Image discovery and ordering
-│   ├── text/          # Text cleanup and chunking
-│   ├── dedupe/        # Deduplication logic
-│   └── report/        # JSON report generation
-├── input/             # User-provided input directory
-├── output/            # Generated output directory
-├── testdata/          # Test fixtures
-└── scripts/           # Utility scripts
-```
-
-## License
-
-See LICENSE file for details.
