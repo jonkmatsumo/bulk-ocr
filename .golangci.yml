@@ -1,17 +1,15 @@
+# This file is the configuration for golangci-lint.
+# See https://golangci-lint.run/usage/configuration/ for more information.
+
+version: 2
+
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
-  disable:
-    - typecheck  # Disabled due to Go 1.23 compatibility issues; govet provides type checking
-
-linters-settings:
-  govet:
-    check-shadowing: true
 
 issues:
   exclude-use-default: false

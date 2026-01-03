@@ -10,8 +10,7 @@ COPY go.sum* ./
 RUN go mod download
 
 # Copy source code
-COPY cmd/ ./cmd/
-COPY internal/ ./internal/
+COPY . .
 
 # Build binary
 RUN go build -o /pipeline ./cmd/pipeline
@@ -20,6 +19,16 @@ RUN go build -o /pipeline ./cmd/pipeline
 FROM alpine:latest
 
 WORKDIR /work
+
+# Install required tools
+RUN apk add --no-cache \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    ghostscript \
+    poppler-utils \
+    python3 \
+    py3-pip \
+    && pip3 install --no-cache-dir ocrmypdf img2pdf
 
 # Copy binary from builder
 COPY --from=builder /pipeline /pipeline

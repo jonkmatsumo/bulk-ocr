@@ -50,6 +50,14 @@ docker-test: docker-build
 	@docker run --rm bulk-ocr:latest doctor
 	@echo "Docker tests passed"
 
+doctor:
+	@echo "Running doctor in container..."
+	@docker compose run --rm pipeline doctor
+
+doctor-smoke:
+	@echo "Running doctor with smoke test in container..."
+	@docker compose run --rm pipeline doctor --smoke
+
 # Cleanup
 clean:
 	@echo "Cleaning build artifacts..."

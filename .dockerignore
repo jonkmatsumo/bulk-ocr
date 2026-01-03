@@ -1,0 +1,41 @@
+# Documentation
+docs/
+
+# Test data
+testdata/
+
+# Input/output directories
+input/
+output/
+
+# Git
+.git/
+.gitignore
+
+# CI
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+pipeline
+*.test
+coverage.*
+
+# Scripts (not needed for build)
+scripts/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Other
+README.md
+LICENSE
+Makefile
+
