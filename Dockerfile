@@ -10,8 +10,7 @@ COPY go.sum* ./
 RUN go mod download
 
 # Copy source code
-COPY cmd/ ./cmd/
-COPY internal/ ./internal/
+COPY . .
 
 # Build binary
 RUN go build -o /pipeline ./cmd/pipeline

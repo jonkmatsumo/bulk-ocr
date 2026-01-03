@@ -6,7 +6,7 @@ A Docker-only document processing pipeline that converts a directory of images i
 
 **Goal**: Process bulk image collections (screenshots, scanned documents, photos) through OCR and produce a single, deduplicated Markdown file with all extracted text.
 
-**Current State**: The pipeline handles image discovery, deterministic ordering, staging, PDF synthesis, OCR processing, text extraction, and text chunking. Deduplication and Markdown output are in development.
+**Current State**: The pipeline handles the complete workflow from image discovery through Markdown output. All core stages are implemented: image discovery, deterministic ordering, staging, PDF synthesis, OCR processing, text extraction, text chunking, deduplication, and Markdown generation.
 
 ## Quickstart
 
@@ -28,8 +28,8 @@ The pipeline processes images through these stages:
 5. **OCR Processing**: Runs OCR on the PDF using ocrmypdf with deskew and rotation
 6. **Text Extraction**: Extracts text from the OCR'd PDF using pdftotext
 7. **Text Chunking**: Splits extracted text into paragraphs, normalizes for hashing, and filters UI artifacts
-8. **Deduplication**: *(In development)* Removes near-duplicate content using SimHash
-9. **Markdown Output**: *(In development)* Produces final `.md` file with deduplicated text
+8. **Deduplication**: Removes near-duplicate content using SimHash with exact hash pre-check
+9. **Markdown Output**: Produces final `result.md` file with deduplicated text
 
 ## Usage
 
@@ -63,6 +63,12 @@ docker run --rm \
 - `--max-blank-lines` (default: `2`): Maximum consecutive blank lines to split on
 - `--emit-chunks-jsonl` (default: `true`): Emit debug JSONL file with chunks
 - `--chrome-regex`: Custom chrome filtering regex pattern (can be repeated)
+- `--simhash-k` (default: `5`): Character k-gram size for SimHash
+- `--simhash-threshold` (default: `6`): Hamming distance threshold for SimHash
+- `--window` (default: `250`): Sliding window size for deduplication
+- `--dedupe` (default: `simhash`): Deduplication method: exact, simhash, or both
+- `--markdown-title` (default: `Extracted Notes`): Title for Markdown document
+- `--include-chunk-ids` (default: `false`): Include chunk IDs as HTML comments in Markdown
 
 ### Subcommands
 

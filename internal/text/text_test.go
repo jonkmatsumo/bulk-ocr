@@ -389,3 +389,317 @@ func TestNormalize_EdgeCase_MixedWhitespace(t *testing.T) {
 		t.Errorf("expected tabs to be collapsed, got: %q", result)
 	}
 }
+
+func TestRenderMarkdown_EmptyChunks(t *testing.T) {
+	result := RenderMarkdown("Test Title", []Chunk{}, false)
+	expected := "# Test Title\n\n"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestRenderMarkdown_SingleChunk(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "This is a test chunk.", Norm: "this is a test chunk", Index: 0},
+	}
+	result := RenderMarkdown("Test Title", chunks, false)
+	expected := "# Test Title\n\nThis is a test chunk.\n\n"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestRenderMarkdown_MultipleChunks(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "First chunk", Norm: "first chunk", Index: 0},
+		{ID: "c0002", Text: "Second chunk", Norm: "second chunk", Index: 1},
+		{ID: "c0003", Text: "Third chunk", Norm: "third chunk", Index: 2},
+	}
+	result := RenderMarkdown("Test Title", chunks, false)
+	if !strings.Contains(result, "# Test Title") {
+		t.Error("expected title header in output")
+	}
+	if !strings.Contains(result, "First chunk") {
+		t.Error("expected first chunk in output")
+	}
+	if !strings.Contains(result, "Second chunk") {
+		t.Error("expected second chunk in output")
+	}
+	if !strings.Contains(result, "Third chunk") {
+		t.Error("expected third chunk in output")
+	}
+	// Verify chunks are separated by blank lines
+	if !strings.Contains(result, "First chunk\n\nSecond chunk") {
+		t.Error("expected blank line between chunks")
+	}
+}
+
+func TestRenderMarkdown_EmptyTitle(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "Test", Norm: "test", Index: 0},
+	}
+	result := RenderMarkdown("", chunks, false)
+	expected := "# Extracted Notes\n\nTest\n\n"
+	if result != expected {
+		t.Errorf("expected default title, got %q", result)
+	}
+}
+
+func TestRenderMarkdown_SpecialMarkdownCharacters(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "Text with *bold* and _italic_ and # header", Norm: "text with bold and italic and header", Index: 0},
+	}
+	result := RenderMarkdown("Test", chunks, false)
+	// Should preserve special characters, not escape them
+	if !strings.Contains(result, "*bold*") {
+		t.Error("expected special Markdown characters to be preserved")
+	}
+	if !strings.Contains(result, "_italic_") {
+		t.Error("expected special Markdown characters to be preserved")
+	}
+	if !strings.Contains(result, "# header") {
+		t.Error("expected special Markdown characters to be preserved")
+	}
+}
+
+func TestRenderMarkdown_ChunksWithNewlines(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "Line 1\nLine 2\nLine 3", Norm: "line 1 line 2 line 3", Index: 0},
+	}
+	result := RenderMarkdown("Test", chunks, false)
+	// Should preserve newlines within chunk
+	if !strings.Contains(result, "Line 1\nLine 2\nLine 3") {
+		t.Error("expected newlines within chunk to be preserved")
+	}
+}
+
+func TestRenderMarkdown_ChunksWithHTML(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "Text with <tag>HTML</tag> content", Norm: "text with html content", Index: 0},
+	}
+	result := RenderMarkdown("Test", chunks, false)
+	// Should preserve HTML
+	if !strings.Contains(result, "<tag>HTML</tag>") {
+		t.Error("expected HTML to be preserved")
+	}
+}
+
+func TestRenderMarkdown_EmptyChunkText(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "", Norm: "", Index: 0},
+		{ID: "c0002", Text: "Non-empty", Norm: "non-empty", Index: 1},
+	}
+	result := RenderMarkdown("Test", chunks, false)
+	// Should include empty chunks
+	if !strings.Contains(result, "\n\n\n\nNon-empty") {
+		t.Error("expected empty chunk to be included (blank line)")
+	}
+}
+
+func TestRenderMarkdown_WithChunkIDs(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "First chunk", Norm: "first chunk", Index: 0},
+		{ID: "c0002", Text: "Second chunk", Norm: "second chunk", Index: 1},
+	}
+	result := RenderMarkdown("Test", chunks, true)
+	// Should include HTML comments
+	if !strings.Contains(result, "<!-- c0001 -->") {
+		t.Error("expected chunk ID comment for c0001")
+	}
+	if !strings.Contains(result, "<!-- c0002 -->") {
+		t.Error("expected chunk ID comment for c0002")
+	}
+	// Verify format
+	if !strings.Contains(result, "<!-- c0001 -->\nFirst chunk") {
+		t.Error("expected comment on separate line before chunk")
+	}
+}
+
+func TestRenderMarkdown_WithoutChunkIDs(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "Test chunk", Norm: "test chunk", Index: 0},
+	}
+	result := RenderMarkdown("Test", chunks, false)
+	// Should not include HTML comments
+	if strings.Contains(result, "<!--") {
+		t.Error("expected no HTML comments when includeChunkIDs is false")
+	}
+}
+
+func TestRenderMarkdown_PreservesOrder(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "First", Norm: "first", Index: 0},
+		{ID: "c0002", Text: "Second", Norm: "second", Index: 1},
+		{ID: "c0003", Text: "Third", Norm: "third", Index: 2},
+	}
+	result := RenderMarkdown("Test", chunks, false)
+	// Verify order is preserved
+	firstPos := strings.Index(result, "First")
+	secondPos := strings.Index(result, "Second")
+	thirdPos := strings.Index(result, "Third")
+	if firstPos == -1 || secondPos == -1 || thirdPos == -1 {
+		t.Fatal("expected all chunks in output")
+	}
+	if firstPos >= secondPos || secondPos >= thirdPos {
+		t.Error("expected chunks to be in order")
+	}
+}
+
+func TestWriteMarkdown_CreatesFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "test.md")
+
+	content := "# Test Title\n\nContent here\n\n"
+	err := WriteMarkdown(content, path)
+	if err != nil {
+		t.Fatalf("WriteMarkdown failed: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Fatal("Markdown file was not created")
+	}
+}
+
+func TestWriteMarkdown_WritesContent(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "test.md")
+
+	content := "# Test Title\n\nContent here\n\n"
+	err := WriteMarkdown(content, path)
+	if err != nil {
+		t.Fatalf("WriteMarkdown failed: %v", err)
+	}
+
+	// Read and verify content
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read Markdown file: %v", err)
+	}
+
+	// WriteMarkdown trims trailing newlines and adds single newline
+	expected := "# Test Title\n\nContent here\n"
+	if string(written) != expected {
+		t.Errorf("expected %q, got %q", expected, string(written))
+	}
+}
+
+func TestWriteMarkdown_NormalizesLineEndings(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "test.md")
+
+	// Content with Windows line endings
+	content := "# Test\r\n\r\nContent\r\n"
+	err := WriteMarkdown(content, path)
+	if err != nil {
+		t.Fatalf("WriteMarkdown failed: %v", err)
+	}
+
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read Markdown file: %v", err)
+	}
+
+	// Should be normalized to \n
+	if strings.Contains(string(written), "\r\n") {
+		t.Error("expected line endings to be normalized to \\n")
+	}
+	if strings.Contains(string(written), "\r") {
+		t.Error("expected line endings to be normalized to \\n")
+	}
+}
+
+func TestWriteMarkdown_EndsWithSingleNewline(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "test.md")
+
+	// Content with multiple trailing newlines
+	content := "# Test\n\nContent\n\n\n\n"
+	err := WriteMarkdown(content, path)
+	if err != nil {
+		t.Fatalf("WriteMarkdown failed: %v", err)
+	}
+
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read Markdown file: %v", err)
+	}
+
+	// Should end with single newline
+	if !strings.HasSuffix(string(written), "\n") {
+		t.Error("expected file to end with newline")
+	}
+	// Should not end with double newline
+	if strings.HasSuffix(string(written), "\n\n") {
+		t.Error("expected file to end with single newline, not double")
+	}
+}
+
+func TestWriteMarkdown_FileWriteError(t *testing.T) {
+	// Try to write to invalid path
+	invalidPath := "/nonexistent/directory/test.md"
+
+	content := "# Test\n\nContent\n"
+	err := WriteMarkdown(content, invalidPath)
+	if err == nil {
+		t.Error("expected error for invalid path, got nil")
+	}
+}
+
+func TestWriteMarkdown_Integration(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "result.md")
+
+	chunks := []Chunk{
+		{ID: "c0001", Text: "First chunk", Norm: "first chunk", Index: 0},
+		{ID: "c0002", Text: "Second chunk", Norm: "second chunk", Index: 1},
+	}
+
+	// Render and write
+	markdown := RenderMarkdown("Test Document", chunks, true)
+	err := WriteMarkdown(markdown, path)
+	if err != nil {
+		t.Fatalf("WriteMarkdown failed: %v", err)
+	}
+
+	// Verify file is readable Markdown
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read Markdown file: %v", err)
+	}
+
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "# Test Document") {
+		t.Error("expected title in file")
+	}
+	if !strings.Contains(contentStr, "First chunk") {
+		t.Error("expected first chunk in file")
+	}
+	if !strings.Contains(contentStr, "Second chunk") {
+		t.Error("expected second chunk in file")
+	}
+	if !strings.Contains(contentStr, "<!-- c0001 -->") {
+		t.Error("expected chunk ID comment in file")
+	}
+}
+
+func TestRenderMarkdown_Unicode(t *testing.T) {
+	chunks := []Chunk{
+		{ID: "c0001", Text: "Café naïve résumé", Norm: "café naïve résumé", Index: 0},
+	}
+	result := RenderMarkdown("Test", chunks, false)
+	if !strings.Contains(result, "Café naïve résumé") {
+		t.Error("expected Unicode characters to be preserved")
+	}
+}
+
+func TestRenderMarkdown_VeryLongChunk(t *testing.T) {
+	longText := strings.Repeat("This is a very long chunk. ", 1000)
+	chunks := []Chunk{
+		{ID: "c0001", Text: longText, Norm: longText, Index: 0},
+	}
+	result := RenderMarkdown("Test", chunks, false)
+	if !strings.Contains(result, longText) {
+		t.Error("expected very long chunk to be preserved")
+	}
+}

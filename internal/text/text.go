@@ -213,3 +213,67 @@ func WriteChunksJSONL(chunks []Chunk, path string) error {
 
 	return nil
 }
+
+// RenderMarkdown renders chunks into Markdown format with a title.
+// If includeChunkIDs is true, adds HTML comments before each chunk.
+func RenderMarkdown(title string, chunks []Chunk, includeChunkIDs bool) string {
+	// Use default title if empty
+	if title == "" {
+		title = "Extracted Notes"
+	}
+
+	var result strings.Builder
+	// Write title header
+	result.WriteString("# ")
+	result.WriteString(title)
+	result.WriteString("\n\n")
+
+	// Write chunks
+	for _, chunk := range chunks {
+		if includeChunkIDs {
+			// Add HTML comment with chunk ID
+			result.WriteString("<!-- ")
+			result.WriteString(chunk.ID)
+			result.WriteString(" -->\n")
+		}
+		// Write chunk text
+		result.WriteString(chunk.Text)
+		// Add blank line separator
+		result.WriteString("\n\n")
+	}
+
+	return result.String()
+}
+
+// WriteMarkdown writes Markdown content to a file with consistent line endings.
+func WriteMarkdown(content string, path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create Markdown file: %w", err)
+	}
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to close Markdown file %s: %v\n", path, cerr)
+		}
+	}()
+
+	writer := bufio.NewWriter(file)
+	defer func() {
+		if ferr := writer.Flush(); ferr != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to flush Markdown writer for %s: %v\n", path, ferr)
+		}
+	}()
+
+	// Normalize line endings to \n and ensure file ends with single newline
+	normalized := strings.ReplaceAll(content, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	// Trim trailing newlines and add single newline
+	normalized = strings.TrimRight(normalized, "\n")
+	normalized += "\n"
+
+	if _, err := writer.WriteString(normalized); err != nil {
+		return fmt.Errorf("failed to write Markdown content: %w", err)
+	}
+
+	return nil
+}
