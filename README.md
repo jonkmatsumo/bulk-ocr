@@ -11,11 +11,27 @@ A Docker-only document processing pipeline that converts a directory of images i
 ## Quickstart
 
 ```bash
-# Place images in ./input directory
+# 1. Place your images in ./input directory (supports .jpg, .jpeg, .png)
+mkdir -p input output
+
+# 2. Run the pipeline
 docker compose up --build
 
-# Outputs appear in ./output
+# 3. Check the results
+cat output/result.md          # Final deduplicated Markdown output
+cat output/dedupe_report.json # Deduplication statistics
 ```
+
+**Test the setup first:**
+```bash
+# Run integration test to verify everything works
+make integration
+```
+
+**What you'll get:**
+- `output/result.md` - Final Markdown document with all extracted text
+- `output/dedupe_report.json` - Statistics about duplicates removed
+- `output/preprocessed/` - Staged images (if `--keep-artifacts=true`)
 
 ## How It Works
 
@@ -75,13 +91,125 @@ docker run --rm \
 - `pipeline version`: Show version information
 - `pipeline doctor`: Check toolchain health (verifies OCR tools are installed)
 
+## Tuning Guide
+
+The pipeline provides several knobs to tune output quality and performance. Here are common scenarios and recommended adjustments:
+
+### Too Many Small Fragments
+
+If your output contains many small, incomplete chunks:
+
+- **Increase `--min-chunk-chars`**: Raise from default `60` to `100` or `150` to filter out shorter fragments
+- **Example**: `--min-chunk-chars=100`
+
+### False Positive Duplicates
+
+If legitimate content is being marked as duplicates:
+
+- **Lower `--simhash-threshold`**: Reduce from default `6` to `4` or `5` to be less aggressive (range: 0-64)
+- **Switch to `--dedupe=exact`**: Only remove exact duplicates, not near-duplicates
+- **Example**: `--simhash-threshold=4 --dedupe=exact`
+
+### Duplicates Persist
+
+If duplicates are not being caught:
+
+- **Increase `--window`**: Raise from default `250` to `500` or `1000` to compare against more previous chunks
+- **Switch to `--dedupe=both`**: Use both exact and SimHash methods for maximum deduplication
+- **Example**: `--window=500 --dedupe=both`
+
+### Too Many UI Artifacts
+
+If browser chrome, timestamps, or system UI elements appear in output:
+
+- **Add custom `--chrome-regex` patterns**: Define patterns specific to your screenshots
+- **Example**: `--chrome-regex="\\d{2}:\\d{2}" --chrome-regex="battery|wifi"`
+- **Note**: Patterns are matched against normalized (lowercase, no punctuation) text
+
+### Performance Issues
+
+If processing large image sets times out:
+
+- **Increase timeouts**: Adjust `--pdf-timeout`, `--ocr-timeout`, or `--extract-timeout` as needed
+- **Example**: `--ocr-timeout=20m` for very large PDFs
+- **Disable debug output**: Set `--emit-chunks-jsonl=false` to reduce I/O
+
+### Choosing Deduplication Method
+
+- **`exact`**: Fastest, only removes identical chunks. Use when duplicates are exact copies.
+- **`simhash`** (default): Balanced, removes near-duplicates. Best for most use cases.
+- **`both`**: Most aggressive, uses both methods. Use when maximum deduplication is needed.
+
 ## Troubleshooting
 
-**No images found**: Ensure images are in the input directory with supported extensions (`.jpg`, `.jpeg`, `.png`, case-insensitive).
+### No Images Found
 
-**Docker build fails**: Verify Docker is running and `go.mod` is valid.
+**Symptom**: Pipeline reports "no images found in input directory"
 
-**Permission errors**: Ensure the output directory is writable.
+**Solutions**:
+- Ensure images are in the input directory with supported extensions (`.jpg`, `.jpeg`, `.png`, case-insensitive)
+- Check that `--recursive=true` if images are in subdirectories
+- Verify file permissions allow reading the input directory
+
+### Docker Build Fails
+
+**Symptom**: `docker build` command fails with errors
+
+**Solutions**:
+- Verify Docker is running: `docker ps`
+- Check that `go.mod` is valid: `go mod verify`
+- Ensure network connectivity for downloading base images
+- Review Docker logs for specific error messages
+
+### Permission Errors
+
+**Symptom**: Pipeline fails with "permission denied" errors
+
+**Solutions**:
+- Ensure the output directory is writable: `chmod 755 output`
+- Check Docker volume mount permissions
+- Verify user has write access to mounted directories
+
+### Images Appear Rotated
+
+**Symptom**: Text in output appears rotated or upside down
+
+**Solutions**:
+- The pipeline uses `ocrmypdf` with automatic rotation detection
+- If rotation persists, images may need manual correction before processing
+- Check image EXIF orientation data: `exiftool image.jpg`
+
+### Empty OCR Output
+
+**Symptom**: `result.md` is empty or contains very little text
+
+**Solutions**:
+- Verify images contain readable text (not just images/diagrams)
+- Check OCR language matches image content: `--lang=eng` for English
+- Ensure image quality is sufficient (not too blurry or low resolution)
+- Review `extracted.txt` (if `--keep-artifacts=true`) to see raw OCR output
+- Try increasing `--ocr-timeout` if processing is timing out
+
+### Too Many UI Artifacts
+
+**Symptom**: Output contains browser chrome, timestamps, battery indicators, etc.
+
+**Solutions**:
+- Add custom chrome filtering patterns: `--chrome-regex="\\d{2}:\\d{2}"`
+- Increase `--min-chunk-chars` to filter out short UI elements
+- Review `chunks_raw.jsonl` (if `--emit-chunks-jsonl=true`) to identify patterns
+- Chrome filtering only applies to chunks under 100 characters by default
+
+### Performance Issues
+
+**Symptom**: Pipeline times out or runs very slowly
+
+**Solutions**:
+- Increase timeout values: `--pdf-timeout=10m --ocr-timeout=20m`
+- Process images in smaller batches
+- Disable debug output: `--emit-chunks-jsonl=false`
+- Use `--keep-artifacts=false` to reduce disk I/O
+- Check Docker resource limits (CPU, memory)
 
 ## Development
 

@@ -10,7 +10,15 @@ COPY go.sum* ./
 RUN go mod download
 
 # Copy source code
+# Strategy: Copy everything first, then verify critical directories exist
 COPY . .
+
+# Verify source directories exist (helps debug CI build context issues)
+# This will fail early with a clear error message if directories are missing
+RUN ls -la /build && \
+    test -d cmd/pipeline || (echo "ERROR: cmd/pipeline directory not found in build context" && ls -la /build && exit 1) && \
+    test -d internal || (echo "ERROR: internal directory not found in build context" && ls -la /build && exit 1) && \
+    echo "Source directories verified successfully"
 
 # Build binary
 RUN go build -o /pipeline ./cmd/pipeline
@@ -34,6 +42,9 @@ RUN apk add --no-cache \
     && (tesseract --list-langs 2>&1 | grep -q "^eng$" || \
         curl -L https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata \
              -o /usr/share/tessdata/eng.traineddata) \
+    && (test -f /usr/share/tessdata/osd.traineddata || \
+        curl -L https://github.com/tesseract-ocr/tessdata/raw/main/osd.traineddata \
+             -o /usr/share/tessdata/osd.traineddata) \
     && apk del curl \
     && tesseract --list-langs | grep -q "^eng$" || (echo "Warning: English language data not found" && exit 1)
 
