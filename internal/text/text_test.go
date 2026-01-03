@@ -8,4 +8,3 @@ func TestChunk(t *testing.T) {
 		t.Errorf("expected nil, got %v", result)
 	}
 }
-

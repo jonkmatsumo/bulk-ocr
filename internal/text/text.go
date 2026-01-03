@@ -5,4 +5,3 @@ package text
 func Chunk(text string) []string {
 	return nil
 }
-

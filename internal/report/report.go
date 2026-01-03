@@ -5,4 +5,3 @@ type Report struct {
 	InputImages int `json:"input_images"`
 	// Additional fields will be added in later milestones
 }
-

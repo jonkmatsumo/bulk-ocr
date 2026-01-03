@@ -13,4 +13,3 @@ type Runner struct{}
 func (r *Runner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
 	return nil, fmt.Errorf("not implemented")
 }
-

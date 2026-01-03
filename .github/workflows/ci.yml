@@ -60,9 +60,9 @@ jobs:
           go-version: '1.23'
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.55.2
+          version: latest
 
   docker-build:
     name: Docker Build

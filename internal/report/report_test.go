@@ -24,4 +24,3 @@ func TestReport_JSONMarshaling(t *testing.T) {
 		t.Errorf("expected %d input images, got %d", r.InputImages, unmarshaled.InputImages)
 	}
 }
-

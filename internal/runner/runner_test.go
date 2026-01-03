@@ -33,4 +33,3 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 		t.Error("expected error, got nil")
 	}
 }
-

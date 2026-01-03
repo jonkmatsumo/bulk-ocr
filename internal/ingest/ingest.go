@@ -64,4 +64,3 @@ func naturalLess(a, b string) bool {
 	// For Milestone 0, this is sufficient.
 	return a < b
 }
-

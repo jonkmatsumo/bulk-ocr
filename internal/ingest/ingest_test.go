@@ -12,7 +12,7 @@ func TestListImages(t *testing.T) {
 
 	// Create test files
 	files := []struct {
-		name     string
+		name          string
 		shouldInclude bool
 	}{
 		{"image1.jpg", true},
@@ -142,4 +142,3 @@ func TestNaturalSort(t *testing.T) {
 		})
 	}
 }
-

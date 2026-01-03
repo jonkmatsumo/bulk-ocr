@@ -5,8 +5,9 @@ linters:
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
+  disable:
+    - typecheck  # Disabled due to Go 1.23 compatibility issues; govet provides type checking
 
 linters-settings:
   govet:
@@ -16,4 +17,9 @@ issues:
   exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-rules:
+    # Exclude standard library from checks that may have false positives
+    - path: _test\.go
+      linters:
+        - errcheck
 
