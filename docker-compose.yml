@@ -1,0 +1,8 @@
+services:
+  pipeline:
+    build: .
+    volumes:
+      - ./input:/work/input:ro
+      - ./output:/work/output
+    command: ["run", "--input", "/work/input", "--out", "/work/output"]
+

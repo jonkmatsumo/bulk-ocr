@@ -30,3 +30,17 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Documentation (internal)
+docs/
+
+# Cursor rules
+.cursorrules
+
+# Output directory (keep .gitkeep)
+output/**
+!output/.gitkeep
+
+# Build artifacts
+pipeline
+coverage.html
