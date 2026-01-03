@@ -6,7 +6,7 @@ A Docker-only document processing pipeline that converts a directory of images i
 
 **Goal**: Process bulk image collections (screenshots, scanned documents, photos) through OCR and produce a single, deduplicated Markdown file with all extracted text.
 
-**Current State**: The pipeline handles image discovery, deterministic ordering, staging, PDF synthesis, OCR processing, and text extraction. Deduplication and Markdown output are in development.
+**Current State**: The pipeline handles image discovery, deterministic ordering, staging, PDF synthesis, OCR processing, text extraction, and text chunking. Deduplication and Markdown output are in development.
 
 ## Quickstart
 
@@ -27,8 +27,9 @@ The pipeline processes images through these stages:
 4. **PDF Synthesis**: Combines staged images into a single PDF using img2pdf
 5. **OCR Processing**: Runs OCR on the PDF using ocrmypdf with deskew and rotation
 6. **Text Extraction**: Extracts text from the OCR'd PDF using pdftotext
-7. **Deduplication**: *(In development)* Removes near-duplicate content using SimHash
-8. **Markdown Output**: *(In development)* Produces final `.md` file with deduplicated text
+7. **Text Chunking**: Splits extracted text into paragraphs, normalizes for hashing, and filters UI artifacts
+8. **Deduplication**: *(In development)* Removes near-duplicate content using SimHash
+9. **Markdown Output**: *(In development)* Produces final `.md` file with deduplicated text
 
 ## Usage
 
@@ -58,6 +59,10 @@ docker run --rm \
 - `--pdf-timeout` (default: `5m`): Timeout for PDF synthesis
 - `--ocr-timeout` (default: `10m`): Timeout for OCR processing
 - `--extract-timeout` (default: `2m`): Timeout for text extraction
+- `--min-chunk-chars` (default: `60`): Minimum chunk size in characters
+- `--max-blank-lines` (default: `2`): Maximum consecutive blank lines to split on
+- `--emit-chunks-jsonl` (default: `true`): Emit debug JSONL file with chunks
+- `--chrome-regex`: Custom chrome filtering regex pattern (can be repeated)
 
 ### Subcommands
 

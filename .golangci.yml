@@ -1,7 +1,7 @@
 # This file is the configuration for golangci-lint.
 # See https://golangci-lint.run/usage/configuration/ for more information.
 
-version: 2
+version: "2"
 
 linters:
   enable:
@@ -12,7 +12,6 @@ linters:
     - unused
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
   exclude-rules:
