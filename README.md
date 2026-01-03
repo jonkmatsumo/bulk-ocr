@@ -6,7 +6,7 @@ A Docker-only document processing pipeline that converts a directory of images i
 
 **Goal**: Process bulk image collections (screenshots, scanned documents, photos) through OCR and produce a single, deduplicated Markdown file with all extracted text.
 
-**Current State**: The pipeline currently handles image discovery, deterministic ordering, and staging. OCR processing and text extraction are in development.
+**Current State**: The pipeline handles image discovery, deterministic ordering, staging, PDF synthesis, OCR processing, and text extraction. Deduplication and Markdown output are in development.
 
 ## Quickstart
 
@@ -24,9 +24,11 @@ The pipeline processes images through these stages:
 1. **Image Discovery**: Recursively scans for images (`.jpg`, `.jpeg`, `.png`)
 2. **Deterministic Ordering**: Sorts images naturally (e.g., `IMG_9.jpg` before `IMG_10.jpg`)
 3. **Staging**: Copies images to `preprocessed/` with sequential names
-4. **OCR & Text Extraction**: *(In development)* Converts images to PDF, runs OCR, extracts text
-5. **Deduplication**: *(In development)* Removes near-duplicate content using SimHash
-6. **Markdown Output**: *(In development)* Produces final `.md` file with deduplicated text
+4. **PDF Synthesis**: Combines staged images into a single PDF using img2pdf
+5. **OCR Processing**: Runs OCR on the PDF using ocrmypdf with deskew and rotation
+6. **Text Extraction**: Extracts text from the OCR'd PDF using pdftotext
+7. **Deduplication**: *(In development)* Removes near-duplicate content using SimHash
+8. **Markdown Output**: *(In development)* Produces final `.md` file with deduplicated text
 
 ## Usage
 
@@ -51,8 +53,11 @@ docker run --rm \
 - `--input` (default: `input`): Input directory containing images
 - `--out` (default: `output`): Output directory for results
 - `--recursive` (default: `true`): Search subdirectories recursively
-- `--keep-artifacts` (default: `true`): Keep intermediate processing files
+- `--keep-artifacts` (default: `true`): Keep intermediate processing files (combined.pdf, combined_ocr.pdf)
 - `--lang` (default: `eng`): OCR language code
+- `--pdf-timeout` (default: `5m`): Timeout for PDF synthesis
+- `--ocr-timeout` (default: `10m`): Timeout for OCR processing
+- `--extract-timeout` (default: `2m`): Timeout for text extraction
 
 ### Subcommands
 

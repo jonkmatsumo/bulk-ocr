@@ -21,14 +21,21 @@ FROM alpine:latest
 WORKDIR /work
 
 # Install required tools
+# Note: tesseract-ocr may include English by default, but we'll verify and download if needed
 RUN apk add --no-cache \
     tesseract-ocr \
-    tesseract-ocr-eng \
+    curl \
     ghostscript \
     poppler-utils \
     python3 \
     py3-pip \
-    && pip3 install --no-cache-dir ocrmypdf img2pdf
+    && pip3 install --break-system-packages --no-cache-dir ocrmypdf img2pdf \
+    && mkdir -p /usr/share/tessdata \
+    && (tesseract --list-langs 2>&1 | grep -q "^eng$" || \
+        curl -L https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata \
+             -o /usr/share/tessdata/eng.traineddata) \
+    && apk del curl \
+    && tesseract --list-langs | grep -q "^eng$" || (echo "Warning: English language data not found" && exit 1)
 
 # Copy binary from builder
 COPY --from=builder /pipeline /pipeline
