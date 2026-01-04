@@ -12,10 +12,20 @@ import (
 	"github.com/jonkmatsumo/bulk-ocr/internal/runner"
 )
 
+// runnerInterface allows mocking the runner for testing
+type runnerInterface interface {
+	Run(ctx context.Context, bin string, args []string, opts runner.RunOpts) (runner.Result, error)
+}
+
 // BuildPDF combines staged images into a single PDF using img2pdf.
 // Takes staged images from preprocessedDir and writes combined.pdf to outputDir.
 // Returns the path to the created PDF file.
 func BuildPDF(preprocessedDir, outputDir string, timeout time.Duration) (string, error) {
+	return buildPDFWithRunner(runner.New(), preprocessedDir, outputDir, timeout)
+}
+
+// buildPDFWithRunner is the internal implementation that accepts a runner interface for testing
+func buildPDFWithRunner(r runnerInterface, preprocessedDir, outputDir string, timeout time.Duration) (string, error) {
 	// List all image files in preprocessed directory
 	files, err := filepath.Glob(filepath.Join(preprocessedDir, "*"))
 	if err != nil {
@@ -42,7 +52,6 @@ func BuildPDF(preprocessedDir, outputDir string, timeout time.Duration) (string,
 	outputPath := filepath.Join(outputDir, "combined.pdf")
 	args := append(imageFiles, "-o", outputPath)
 
-	r := runner.New()
 	ctx := context.Background()
 	opts := runner.RunOpts{
 		Timeout:    timeout,
@@ -67,6 +76,11 @@ func BuildPDF(preprocessedDir, outputDir string, timeout time.Duration) (string,
 // Takes a PDF path and writes the OCR'd PDF to outputDir as combined_ocr.pdf.
 // Returns the path to the created OCR PDF file.
 func OCRPDF(pdfPath, outputDir, lang string, timeout time.Duration) (string, error) {
+	return ocrPDFWithRunner(runner.New(), pdfPath, outputDir, lang, timeout)
+}
+
+// ocrPDFWithRunner is the internal implementation that accepts a runner interface for testing
+func ocrPDFWithRunner(r runnerInterface, pdfPath, outputDir, lang string, timeout time.Duration) (string, error) {
 	outputPath := filepath.Join(outputDir, "combined_ocr.pdf")
 
 	// Build command: ocrmypdf --deskew --rotate-pages -l <lang> input.pdf output.pdf
@@ -78,7 +92,6 @@ func OCRPDF(pdfPath, outputDir, lang string, timeout time.Duration) (string, err
 		outputPath,
 	}
 
-	r := runner.New()
 	ctx := context.Background()
 	opts := runner.RunOpts{
 		Timeout:    timeout,
@@ -104,6 +117,11 @@ func OCRPDF(pdfPath, outputDir, lang string, timeout time.Duration) (string, err
 // Validates that the extracted text is not empty (minimum 20 characters).
 // Returns the path to the created text file.
 func ExtractText(pdfPath, outputDir string, timeout time.Duration) (string, error) {
+	return extractTextWithRunner(runner.New(), pdfPath, outputDir, timeout)
+}
+
+// extractTextWithRunner is the internal implementation that accepts a runner interface for testing
+func extractTextWithRunner(r runnerInterface, pdfPath, outputDir string, timeout time.Duration) (string, error) {
 	outputPath := filepath.Join(outputDir, "extracted.txt")
 
 	// Build command: pdftotext -layout input.pdf output.txt
@@ -113,7 +131,6 @@ func ExtractText(pdfPath, outputDir string, timeout time.Duration) (string, erro
 		outputPath,
 	}
 
-	r := runner.New()
 	ctx := context.Background()
 	opts := runner.RunOpts{
 		Timeout:    timeout,
