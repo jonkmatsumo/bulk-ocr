@@ -38,11 +38,17 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
-      - name: Run tests
-        run: go test ./... -v
+      - name: Run unit tests
+        run: go test ./... -v -coverprofile=coverage.out
+
+      - name: Generate test coverage report
+        run: |
+          echo "=== Test Coverage Summary ==="
+          go tool cover -func=coverage.out | tail -1
+          go tool cover -html=coverage.out -o coverage.html || true
 
       - name: Run tests with race detector
-        run: go test ./... -race || true
+        run: go test ./... -race
 
       - name: Build
         run: go build ./...
