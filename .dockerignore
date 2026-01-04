@@ -22,7 +22,8 @@ output/
 *.swo
 
 # Build artifacts
-pipeline
+/pipeline
+pipeline.exe
 *.test
 coverage.*
 

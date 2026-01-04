@@ -10,15 +10,7 @@ COPY go.sum* ./
 RUN go mod download
 
 # Copy source code
-# Strategy: Copy everything first, then verify critical directories exist
 COPY . .
-
-# Verify source directories exist (helps debug CI build context issues)
-# This will fail early with a clear error message if directories are missing
-RUN ls -la /build && \
-    test -d cmd/pipeline || (echo "ERROR: cmd/pipeline directory not found in build context" && ls -la /build && exit 1) && \
-    test -d internal || (echo "ERROR: internal directory not found in build context" && ls -la /build && exit 1) && \
-    echo "Source directories verified successfully"
 
 # Build binary
 RUN go build -o /pipeline ./cmd/pipeline

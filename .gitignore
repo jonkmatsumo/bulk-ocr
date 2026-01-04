@@ -42,5 +42,6 @@ output/**
 !output/.gitkeep
 
 # Build artifacts
-pipeline
+/pipeline
+pipeline.exe
 coverage.html
