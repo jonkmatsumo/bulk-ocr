@@ -12,15 +12,25 @@ import (
 	"github.com/jonkmatsumo/bulk-ocr/internal/runner"
 )
 
+// runnerInterface for mocking in tests
+type runnerInterface interface {
+	LookPath(bin string) (string, error)
+	Run(ctx context.Context, bin string, args []string, opts runner.RunOpts) (runner.Result, error)
+}
+
 // doctorCommand runs the doctor subcommand to validate the toolchain.
 func doctorCommand(args []string) error {
+	return doctorCommandWithRunner(args, runner.New())
+}
+
+// doctorCommandWithRunner allows injecting a mock runner for testing
+func doctorCommandWithRunner(args []string, r runnerInterface) error {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	smoke := fs.Bool("smoke", false, "Run smoke test to verify end-to-end functionality")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("failed to parse flags: %w", err)
 	}
 
-	r := runner.New()
 	ctx := context.Background()
 
 	log.Println("Doctor report:")
@@ -94,16 +104,32 @@ func doctorCommand(args []string) error {
 	// Smoke test
 	if *smoke {
 		log.Println("Running smoke test...")
-		if err := runSmokeTest(ctx, r); err != nil {
-			log.Printf("Smoke test: FAILED (%v)", err)
-			os.Exit(2)
+		// Type assertion to *runner.Runner for runSmokeTest
+		if realRunner, ok := r.(*runner.Runner); ok {
+			if err := runSmokeTest(ctx, realRunner); err != nil {
+				log.Printf("Smoke test: FAILED (%v)", err)
+				// In test mode, return error instead of exiting
+				if _, ok := r.(*runner.Runner); !ok {
+					return fmt.Errorf("smoke test failed: %w", err)
+				}
+				os.Exit(2)
+			}
+			log.Println("Smoke test: PASSED")
+		} else {
+			// In tests, skip smoke test if runner is mocked
+			log.Println("Smoke test: SKIPPED (mocked runner)")
 		}
-		log.Println("Smoke test: PASSED")
 	} else {
 		log.Println("Smoke test: SKIPPED (use --smoke to run)")
 	}
 
 	if hasErrors {
+		// In test mode, return error instead of exiting
+		// Check if we're in a test by checking if runner is mocked
+		if _, ok := r.(*runner.Runner); !ok {
+			// Mocked runner means we're in a test - return error instead of exiting
+			return fmt.Errorf("doctor found errors: missing or failed tools")
+		}
 		os.Exit(1)
 	}
 

@@ -18,6 +18,36 @@ import (
 
 const version = "0.0.1"
 
+// pipelineStages interface for mocking pipeline operations in tests
+type pipelineStages interface {
+	BuildPDF(preprocessedDir, outputDir string, timeout time.Duration) (string, error)
+	OCRPDF(pdfPath, outputDir, lang string, timeout time.Duration) (string, error)
+	ExtractText(pdfPath, outputDir string, timeout time.Duration) (string, error)
+	CleanupArtifact(path string) error
+}
+
+// realPipelineStages implements pipelineStages using actual pipeline functions
+type realPipelineStages struct{}
+
+func (r *realPipelineStages) BuildPDF(preprocessedDir, outputDir string, timeout time.Duration) (string, error) {
+	return pipeline.BuildPDF(preprocessedDir, outputDir, timeout)
+}
+
+func (r *realPipelineStages) OCRPDF(pdfPath, outputDir, lang string, timeout time.Duration) (string, error) {
+	return pipeline.OCRPDF(pdfPath, outputDir, lang, timeout)
+}
+
+func (r *realPipelineStages) ExtractText(pdfPath, outputDir string, timeout time.Duration) (string, error) {
+	return pipeline.ExtractText(pdfPath, outputDir, timeout)
+}
+
+func (r *realPipelineStages) CleanupArtifact(path string) error {
+	return pipeline.CleanupArtifact(path)
+}
+
+// pipelineStagesImpl is a package-level variable that can be swapped in tests
+var pipelineStagesImpl pipelineStages = &realPipelineStages{}
+
 func main() {
 	// Check if first arg is a subcommand (not a flag)
 	// If so, we need to handle flag parsing differently
@@ -134,7 +164,7 @@ func runCommand(inputDir, outputDir string, keepArtifacts bool, lang string, rec
 	preprocessedDir := filepath.Join(outputDir, "preprocessed")
 	log.Printf("Building PDF from %d images...", len(staged))
 	start := time.Now()
-	pdfPath, err := pipeline.BuildPDF(preprocessedDir, outputDir, pdfTimeout)
+	pdfPath, err := pipelineStagesImpl.BuildPDF(preprocessedDir, outputDir, pdfTimeout)
 	if err != nil {
 		return fmt.Errorf("PDF synthesis failed: %w", err)
 	}
@@ -143,7 +173,7 @@ func runCommand(inputDir, outputDir string, keepArtifacts bool, lang string, rec
 	// Pipeline stage 2: Run OCR on PDF
 	log.Printf("Running OCR (language: %s)...", lang)
 	start = time.Now()
-	ocrPath, err := pipeline.OCRPDF(pdfPath, outputDir, lang, ocrTimeout)
+	ocrPath, err := pipelineStagesImpl.OCRPDF(pdfPath, outputDir, lang, ocrTimeout)
 	if err != nil {
 		return fmt.Errorf("OCR failed: %w", err)
 	}
@@ -151,7 +181,7 @@ func runCommand(inputDir, outputDir string, keepArtifacts bool, lang string, rec
 
 	// Cleanup combined.pdf if not keeping artifacts
 	if !keepArtifacts {
-		if err := pipeline.CleanupArtifact(pdfPath); err != nil {
+		if err := pipelineStagesImpl.CleanupArtifact(pdfPath); err != nil {
 			log.Printf("warning: failed to cleanup combined.pdf: %v", err)
 		} else {
 			log.Printf("cleaned up combined.pdf")
@@ -161,7 +191,7 @@ func runCommand(inputDir, outputDir string, keepArtifacts bool, lang string, rec
 	// Pipeline stage 3: Extract text from OCR PDF
 	log.Printf("Extracting text from OCR PDF...")
 	start = time.Now()
-	textPath, err := pipeline.ExtractText(ocrPath, outputDir, extractTimeout)
+	textPath, err := pipelineStagesImpl.ExtractText(ocrPath, outputDir, extractTimeout)
 	if err != nil {
 		return fmt.Errorf("text extraction failed: %w", err)
 	}
@@ -174,7 +204,7 @@ func runCommand(inputDir, outputDir string, keepArtifacts bool, lang string, rec
 
 	// Cleanup combined_ocr.pdf if not keeping artifacts
 	if !keepArtifacts {
-		if err := pipeline.CleanupArtifact(ocrPath); err != nil {
+		if err := pipelineStagesImpl.CleanupArtifact(ocrPath); err != nil {
 			log.Printf("warning: failed to cleanup combined_ocr.pdf: %v", err)
 		} else {
 			log.Printf("cleaned up combined_ocr.pdf")

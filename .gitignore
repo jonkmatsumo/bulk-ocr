@@ -45,3 +45,8 @@ output/**
 /pipeline
 pipeline.exe
 coverage.html
+
+# macOS
+.DS_Store
+input/.DS_Store
+input/actual/
