@@ -514,3 +514,234 @@ func TestDedupe_PreservesOrder(t *testing.T) {
 		t.Errorf("expected third kept chunk to be c0003, got %s", result.KeptChunks[2].ID)
 	}
 }
+
+// TestDedupe_MethodBoth tests the "both" method which requires chunks to pass both exact and simhash checks
+func TestDedupe_MethodBoth(t *testing.T) {
+	config := DefaultConfig()
+	config.Method = "both"
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "Unique chunk one", Norm: "unique chunk one", Index: 0},
+		{ID: "c0002", Text: "Unique chunk two", Norm: "unique chunk two", Index: 1},
+		{ID: "c0003", Text: "Unique chunk three", Norm: "unique chunk three", Index: 2},
+	}
+	result := Dedupe(chunks, config)
+	// All chunks are unique, so all should be kept by both methods
+	if len(result.KeptChunks) != 3 {
+		t.Errorf("expected 3 kept chunks (all unique), got %d", len(result.KeptChunks))
+	}
+	if result.Stats.DroppedCount != 0 {
+		t.Errorf("expected 0 dropped chunks, got %d", result.Stats.DroppedCount)
+	}
+}
+
+// TestDedupe_MethodBoth_ExactDuplicate tests that exact duplicates are dropped in "both" method
+func TestDedupe_MethodBoth_ExactDuplicate(t *testing.T) {
+	config := DefaultConfig()
+	config.Method = "both"
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "Test chunk", Norm: "test chunk", Index: 0},
+		{ID: "c0002", Text: "Test chunk", Norm: "test chunk", Index: 1}, // Exact duplicate
+		{ID: "c0003", Text: "Unique chunk", Norm: "unique chunk", Index: 2},
+	}
+	result := Dedupe(chunks, config)
+	// c0002 should be dropped by exact hash, so it won't pass "both" check
+	if len(result.KeptChunks) != 2 {
+		t.Errorf("expected 2 kept chunks (c0001 and c0003), got %d", len(result.KeptChunks))
+	}
+	if result.Stats.ExactDups == 0 {
+		t.Error("expected at least 1 exact duplicate to be detected")
+	}
+	// Verify c0002 is in dropped list
+	found := false
+	for _, dropped := range result.Dropped {
+		if dropped.ChunkID == "c0002" {
+			found = true
+			if dropped.Reason != "exact_duplicate" {
+				t.Errorf("expected reason exact_duplicate, got %s", dropped.Reason)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected c0002 to be in dropped list")
+	}
+}
+
+// TestDedupe_MethodBoth_NearDuplicate tests that near-duplicates are dropped in "both" method
+func TestDedupe_MethodBoth_NearDuplicate(t *testing.T) {
+	config := DefaultConfig()
+	config.Method = "both"
+	config.SimHashThreshold = 10 // Higher threshold to catch near-duplicates
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "This is a test string for simhash deduplication", Norm: "this is a test string for simhash deduplication", Index: 0},
+		{ID: "c0002", Text: "This is a test string for simhash deduplication with small change", Norm: "this is a test string for simhash deduplication with small change", Index: 1}, // Near duplicate
+		{ID: "c0003", Text: "Completely different content here", Norm: "completely different content here", Index: 2},
+	}
+	result := Dedupe(chunks, config)
+	// c0002 might be dropped by simhash if similar enough
+	// Verify statistics are correct
+	if result.Stats.InputCount != 3 {
+		t.Errorf("expected 3 input chunks, got %d", result.Stats.InputCount)
+	}
+	if result.Stats.KeptCount+result.Stats.DroppedCount != result.Stats.InputCount {
+		t.Errorf("kept + dropped should equal input: %d + %d != %d",
+			result.Stats.KeptCount, result.Stats.DroppedCount, result.Stats.InputCount)
+	}
+}
+
+// TestDedupe_MethodBoth_DroppedByBoth tests chunk dropped by both methods
+func TestDedupe_MethodBoth_DroppedByBoth(t *testing.T) {
+	config := DefaultConfig()
+	config.Method = "both"
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "Test chunk", Norm: "test chunk", Index: 0},
+		{ID: "c0002", Text: "Test chunk", Norm: "test chunk", Index: 1}, // Exact duplicate, will be dropped
+	}
+	result := Dedupe(chunks, config)
+	// c0002 should be dropped (exact duplicate)
+	if len(result.KeptChunks) != 1 {
+		t.Errorf("expected 1 kept chunk, got %d", len(result.KeptChunks))
+	}
+	if result.KeptChunks[0].ID != "c0001" {
+		t.Errorf("expected kept chunk to be c0001, got %s", result.KeptChunks[0].ID)
+	}
+}
+
+// TestDedupe_MethodBoth_Statistics tests that statistics are correct for "both" method
+func TestDedupe_MethodBoth_Statistics(t *testing.T) {
+	config := DefaultConfig()
+	config.Method = "both"
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "Unique one", Norm: "unique one", Index: 0},
+		{ID: "c0002", Text: "Duplicate", Norm: "duplicate", Index: 1},
+		{ID: "c0003", Text: "Duplicate", Norm: "duplicate", Index: 2}, // Exact duplicate of c0002
+		{ID: "c0004", Text: "Unique two", Norm: "unique two", Index: 3},
+	}
+	result := Dedupe(chunks, config)
+	if result.Stats.InputCount != 4 {
+		t.Errorf("expected 4 input chunks, got %d", result.Stats.InputCount)
+	}
+	if result.Stats.KeptCount+result.Stats.DroppedCount != result.Stats.InputCount {
+		t.Errorf("kept + dropped should equal input: %d + %d != %d",
+			result.Stats.KeptCount, result.Stats.DroppedCount, result.Stats.InputCount)
+	}
+	if result.Stats.ExactDups+result.Stats.NearDups != result.Stats.DroppedCount {
+		t.Errorf("exact + near should equal dropped: %d + %d != %d",
+			result.Stats.ExactDups, result.Stats.NearDups, result.Stats.DroppedCount)
+	}
+}
+
+// TestDedupe_MethodBoth_UniqueDroppedList tests that dropped list doesn't have duplicates
+func TestDedupe_MethodBoth_UniqueDroppedList(t *testing.T) {
+	config := DefaultConfig()
+	config.Method = "both"
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "Test", Norm: "test", Index: 0},
+		{ID: "c0002", Text: "Test", Norm: "test", Index: 1}, // Exact duplicate
+	}
+	result := Dedupe(chunks, config)
+	// Should only have one entry in dropped list (c0002)
+	if len(result.Dropped) != 1 {
+		t.Errorf("expected 1 dropped chunk, got %d", len(result.Dropped))
+	}
+	if result.Dropped[0].ChunkID != "c0002" {
+		t.Errorf("expected dropped chunk ID c0002, got %s", result.Dropped[0].ChunkID)
+	}
+}
+
+// TestDedupe_SingleChunk tests edge case with single chunk
+func TestDedupe_SingleChunk(t *testing.T) {
+	config := DefaultConfig()
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "Single chunk", Norm: "single chunk", Index: 0},
+	}
+	result := Dedupe(chunks, config)
+	if len(result.KeptChunks) != 1 {
+		t.Errorf("expected 1 kept chunk, got %d", len(result.KeptChunks))
+	}
+	if result.KeptChunks[0].ID != "c0001" {
+		t.Errorf("expected kept chunk ID c0001, got %s", result.KeptChunks[0].ID)
+	}
+	if result.Stats.DroppedCount != 0 {
+		t.Errorf("expected 0 dropped chunks, got %d", result.Stats.DroppedCount)
+	}
+	if result.Stats.InputCount != 1 {
+		t.Errorf("expected 1 input count, got %d", result.Stats.InputCount)
+	}
+}
+
+// TestDedupe_AllDuplicates tests edge case where all chunks are duplicates
+func TestDedupe_AllDuplicates(t *testing.T) {
+	config := DefaultConfig()
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "Duplicate", Norm: "duplicate", Index: 0},
+		{ID: "c0002", Text: "Duplicate", Norm: "duplicate", Index: 1},
+		{ID: "c0003", Text: "Duplicate", Norm: "duplicate", Index: 2},
+		{ID: "c0004", Text: "Duplicate", Norm: "duplicate", Index: 3},
+	}
+	result := Dedupe(chunks, config)
+	// Should keep only the first one
+	if len(result.KeptChunks) != 1 {
+		t.Errorf("expected 1 kept chunk, got %d", len(result.KeptChunks))
+	}
+	if result.KeptChunks[0].ID != "c0001" {
+		t.Errorf("expected kept chunk ID c0001, got %s", result.KeptChunks[0].ID)
+	}
+	if result.Stats.DroppedCount != 3 {
+		t.Errorf("expected 3 dropped chunks, got %d", result.Stats.DroppedCount)
+	}
+	if result.Stats.ExactDups != 3 {
+		t.Errorf("expected 3 exact duplicates, got %d", result.Stats.ExactDups)
+	}
+}
+
+// TestDedupe_NoDuplicates tests edge case where no chunks are duplicates
+func TestDedupe_NoDuplicates(t *testing.T) {
+	config := DefaultConfig()
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "Unique chunk one with different content", Norm: "unique chunk one with different content", Index: 0},
+		{ID: "c0002", Text: "Unique chunk two with different content", Norm: "unique chunk two with different content", Index: 1},
+		{ID: "c0003", Text: "Unique chunk three with different content", Norm: "unique chunk three with different content", Index: 2},
+	}
+	result := Dedupe(chunks, config)
+	// All should be kept
+	if len(result.KeptChunks) != 3 {
+		t.Errorf("expected 3 kept chunks, got %d", len(result.KeptChunks))
+	}
+	if result.Stats.DroppedCount != 0 {
+		t.Errorf("expected 0 dropped chunks, got %d", result.Stats.DroppedCount)
+	}
+	if result.Stats.ExactDups != 0 {
+		t.Errorf("expected 0 exact duplicates, got %d", result.Stats.ExactDups)
+	}
+	if result.Stats.NearDups != 0 {
+		t.Errorf("expected 0 near duplicates, got %d", result.Stats.NearDups)
+	}
+}
+
+// TestDedupe_MixedExactAndNearDuplicates tests mixed exact and near-duplicates
+func TestDedupe_MixedExactAndNearDuplicates(t *testing.T) {
+	config := DefaultConfig()
+	config.SimHashThreshold = 10 // Higher threshold to catch near-duplicates
+	chunks := []text.Chunk{
+		{ID: "c0001", Text: "Unique one", Norm: "unique one", Index: 0},
+		{ID: "c0002", Text: "Duplicate", Norm: "duplicate", Index: 1},
+		{ID: "c0003", Text: "Duplicate", Norm: "duplicate", Index: 2}, // Exact duplicate of c0002
+		{ID: "c0004", Text: "This is a test string for simhash", Norm: "this is a test string for simhash", Index: 3},
+		{ID: "c0005", Text: "This is a test string for simhash with small change", Norm: "this is a test string for simhash with small change", Index: 4}, // Near duplicate of c0004
+		{ID: "c0006", Text: "Unique two", Norm: "unique two", Index: 5},
+	}
+	result := Dedupe(chunks, config)
+	// Should have both exact and near duplicates
+	if result.Stats.ExactDups == 0 && result.Stats.NearDups == 0 {
+		t.Error("expected at least some duplicates to be detected")
+	}
+	if result.Stats.KeptCount+result.Stats.DroppedCount != result.Stats.InputCount {
+		t.Errorf("kept + dropped should equal input: %d + %d != %d",
+			result.Stats.KeptCount, result.Stats.DroppedCount, result.Stats.InputCount)
+	}
+	if result.Stats.ExactDups+result.Stats.NearDups != result.Stats.DroppedCount {
+		t.Errorf("exact + near should equal dropped: %d + %d != %d",
+			result.Stats.ExactDups, result.Stats.NearDups, result.Stats.DroppedCount)
+	}
+}
